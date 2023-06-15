@@ -72,66 +72,6 @@ void RTIME_info(const char *info){
 }
 
 //*********************************************************************************************************
-// void max7219_init()  //all MAX7219 init
-// {
-//     uint8_t i, j;
-//     for (i = 0; i < 7; i++) {
-//         digitalWrite(MAX_CS, LOW);
-//         delayMicroseconds(1);
-//         for (j = 0; j < anzMAX; j++) {
-//             SPI.write(InitArr[i][0]);  //register
-//             SPI.write(InitArr[i][1]);  //value
-//         }
-//         digitalWrite(MAX_CS, HIGH);
-//     }
-// }
-// //*********************************************************************************************************
-// void max7219_set_brightness(unsigned short br)  //brightness MAX7219
-// {
-//     uint8_t j;
-//     if (br < 16) {
-//         digitalWrite(MAX_CS, LOW);
-//         delayMicroseconds(1);
-//         for (j = 0; j < anzMAX; j++) {
-//             SPI.write(0x0A);  //register
-//             SPI.write(br);    //value
-//         }
-//         digitalWrite(MAX_CS, HIGH);
-//     }
-// }
-// //*********************************************************************************************************
-// void clear_Display()   //clear all
-// {
-//     uint8_t i, j;
-//     for (i = 0; i < 8; i++)     //8 rows
-//     {
-//         digitalWrite(MAX_CS, LOW);
-//         delayMicroseconds(1);
-//         for (j = anzMAX; j > 0; j--) {
-//             _LEDarr[j - 1][i] = 0;       //LEDarr clear
-//             SPI.write(i + 1);           //current row
-//             SPI.write(_LEDarr[j - 1][i]);
-//         }
-//         digitalWrite(MAX_CS, HIGH);
-//     }
-// }
-// //*********************************************************************************************************
-// void refresh_display() //take info into LEDarr
-// {
-//     uint8_t i, j;
-
-//     for (i = 0; i < 8; i++)     //8 rows
-//     {
-//         digitalWrite(MAX_CS, LOW);
-//         delayMicroseconds(1);
-//         for (j = anzMAX; j > 0; j--) {
-//             SPI.write(i + 1);  //current row
-//             SPI.write(_LEDarr[j - 1][i]);
-//         }
-//         digitalWrite(MAX_CS, HIGH);
-//     }
-// }
-//*********************************************************************************************************
 uint8_t char2Arr_t(unsigned short ch, int PosX, short PosY) { //characters into arr, shows only the time
     int i, j, k, l, m, o1, o2, o3, o4=0;
     PosX++;
@@ -267,23 +207,16 @@ void setup()
     }
     else {
         //if you get here you have connected to the WiFi
-        Serial.println("connected...yeey :)");
+        Serial.println("WiFi connected");
+        Serial.print("IP address: ");
+        Serial.println(WiFi.localIP());
     }
-
-    // while (WiFi.status() != WL_CONNECTED) {
-    // delay(500);
-    // Serial.print(".");
-    // }
-    // Serial.println("");
-
-    Serial.println("WiFi connected");
-    Serial.print("IP address: ");
-    Serial.println(WiFi.localIP());
 
     helpArr_init();
     max7219_init();
     clear_Display();
     max7219_set_brightness(BRIGHTNESS);
+
     _f_rtc= rtc.begin(TZName);
     if(!_f_rtc) Serial.println("no timepacket received from ntp");
     tckr.attach(0.05, timer50ms);    // every 50 msec
@@ -463,10 +396,10 @@ void loop()
             if(f_scroll_x1){ // day month year
                 String txt= "   ";
                 txt += WD_arr[rtc.getweekday()] + " ";
-                txt += String(rtc.getday()) + ". ";
+                txt += String(rtc.getday()) + " ";
                 txt += months_array[rtc.getmonth()] + " ";
                 txt += "20" + String(rtc.getyear()) + "   ";
-                sctxtlen=scrolltext(_dPosX, txt);
+                sctxtlen = scrolltext(_dPosX, txt);
             }
 //          -------------------------------------
             if(f_scroll_x2){ // user defined text
