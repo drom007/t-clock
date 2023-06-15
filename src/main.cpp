@@ -5,26 +5,17 @@
 // system libraries
 #include <Arduino.h>
 #include <fonts.h>
-// #include <ESPAsync_WiFiManager.h>               //https://github.com/khoih-prog/ESPAsync_WiFiManager
+#include <ESP_WiFiManager.h>
+
 #include <SPI.h>
 #include <Ticker.h>
 #include <time.h>
+#include <WiFi.h>      //ESP32 Core WiFi Library
+#include <WebServer.h> //Local DNS Server used for redirecting all requests to the configuration portal (  https://github.com/zhouhan0126/DNSServer---esp32  )
+#include <DNSServer.h> //Local WebServer used to serve the configuration portal (  https://github.com/zhouhan0126/DNSServer---esp32  )
+
 #include "apps/sntp/sntp.h"     // espressif esp32/arduino V1.0.0
 //#include "lwip/apps/sntp.h"   // espressif esp32/arduino V1.0.1-rc2 or higher
-
-// #if defined(ESP8266)
-// #include <ESP8266WiFi.h>
-// #else
-// #include <WiFi.h>
-// #endif
-
-//needed for library
-// #include <DNSServer.h>
-// #if defined(ESP8266)
-// #include <ESP8266WebServer.h>
-// #else
-// #include <WebServer.h>
-// #endif
 
 // Digital I/O used
 #define SPI_MOSI      23
@@ -33,17 +24,15 @@
 #define MAX_CS        5
 
 // Timezone -------------------------------------------
-#define TZName       "MSK-3MSD,M3.5.0,M10.5.0/3"   // Europe Moscow  (examples see at the bottom)
-//#define TZName     "GMT0BST,M3.5.0/1,M10.5.0"     // London
-//#define TZName     "IST-5:30"                     // New Delhi
+#define TZName       "MSK-3"   // Europe Moscow  (examples see at the bottom)
 
 // User defined text ----------------------------------
-#define UDTXT        "Привет!"
+// #define UDTXT        "    Привет! "
 
 // other defines --------------------------------------
 #define BRIGHTNESS   0     // values can be 0...15
 #define anzMAX       4     // number of cascaded MAX7219
-#define FORMAT12H          // if not defined time will be displayed in 12h fromat
+// #define FORMAT12H          // if not defined time will be displayed in 12h fromat
 #define SCROLLDOWN         // if not defined it scrolls up
 //-----------------------------------------------------
 //global variables
@@ -63,10 +52,13 @@ int16_t  _dPosX = 0;                     //xPosition (display the date)
 boolean  _f_updown = false;              //scroll direction
 uint16_t _chbuf[256];
 
-String M_arr[12] = {"Jan.", "Feb.", "Mar.", "Apr.", "May", "June", "July", "Aug.", "Sep.", "Oct.", "Nov.", "Dec."};
-String WD_arr[7] = {"Sun,", "Mon,", "Tue,", "Wed,", "Thu,", "Fri,", "Sat,"};
+// String months_array[12] = {"Jan.", "Feb.", "Mar.", "Apr.", "May", "June", "July", "Aug.", "Sep.", "Oct.", "Nov.", "Dec."};
+// String WD_arr[7] = {"Sun,", "Mon,", "Tue,", "Wed,", "Thu,", "Fri,", "Sat,"};
 
+String months_array[12] = {"Янв", "Фев", "Мар", "Апр", "Май", "Июнь", "Июль", "Авг", "Сен", "Окт", "Ноя", "Дек"};
+String WD_arr[7] = {"Вск,", "Пон,", "Вт,", "Ср,", "Чт,", "Пят,", "Суб,"};
 
+#include <display.h>
 
 //*********************************************************************************************************
 //*    Class RTIME                                                                                        *
@@ -232,91 +224,67 @@ Ticker tckr;
 void RTIME_info(const char *info){
     Serial.printf("rtime_info : %s\n", info);
 }
-//*********************************************************************************************************
-const uint8_t InitArr[7][2] = { { 0x0C, 0x00 },    // display off
-        { 0x00, 0xFF },    // no LEDtest
-        { 0x09, 0x00 },    // BCD off
-        { 0x0F, 0x00 },    // normal operation
-        { 0x0B, 0x07 },    // start display
-        { 0x0A, 0x04 },    // brightness
-        { 0x0C, 0x01 }     // display on
-};
-//*********************************************************************************************************
-void helpArr_init(void)  //helperarray init
-{
-    uint8_t i, j, k;
-    j = 0;
-    k = 0;
-    for (i = 0; i < anzMAX * 8; i++) {
-        _helpArrPos[i] = (1 << j);   //bitmask
-        _helpArrMAX[i] = k;
-        j++;
-        if (j > 7) {
-            j = 0;
-            k++;
-        }
-    }
-}
-//*********************************************************************************************************
-void max7219_init()  //all MAX7219 init
-{
-    uint8_t i, j;
-    for (i = 0; i < 7; i++) {
-        digitalWrite(MAX_CS, LOW);
-        delayMicroseconds(1);
-        for (j = 0; j < anzMAX; j++) {
-            SPI.write(InitArr[i][0]);  //register
-            SPI.write(InitArr[i][1]);  //value
-        }
-        digitalWrite(MAX_CS, HIGH);
-    }
-}
-//*********************************************************************************************************
-void max7219_set_brightness(unsigned short br)  //brightness MAX7219
-{
-    uint8_t j;
-    if (br < 16) {
-        digitalWrite(MAX_CS, LOW);
-        delayMicroseconds(1);
-        for (j = 0; j < anzMAX; j++) {
-            SPI.write(0x0A);  //register
-            SPI.write(br);    //value
-        }
-        digitalWrite(MAX_CS, HIGH);
-    }
-}
-//*********************************************************************************************************
-void clear_Display()   //clear all
-{
-    uint8_t i, j;
-    for (i = 0; i < 8; i++)     //8 rows
-    {
-        digitalWrite(MAX_CS, LOW);
-        delayMicroseconds(1);
-        for (j = anzMAX; j > 0; j--) {
-            _LEDarr[j - 1][i] = 0;       //LEDarr clear
-            SPI.write(i + 1);           //current row
-            SPI.write(_LEDarr[j - 1][i]);
-        }
-        digitalWrite(MAX_CS, HIGH);
-    }
-}
-//*********************************************************************************************************
-void refresh_display() //take info into LEDarr
-{
-    uint8_t i, j;
 
-    for (i = 0; i < 8; i++)     //8 rows
-    {
-        digitalWrite(MAX_CS, LOW);
-        delayMicroseconds(1);
-        for (j = anzMAX; j > 0; j--) {
-            SPI.write(i + 1);  //current row
-            SPI.write(_LEDarr[j - 1][i]);
-        }
-        digitalWrite(MAX_CS, HIGH);
-    }
-}
+//*********************************************************************************************************
+// void max7219_init()  //all MAX7219 init
+// {
+//     uint8_t i, j;
+//     for (i = 0; i < 7; i++) {
+//         digitalWrite(MAX_CS, LOW);
+//         delayMicroseconds(1);
+//         for (j = 0; j < anzMAX; j++) {
+//             SPI.write(InitArr[i][0]);  //register
+//             SPI.write(InitArr[i][1]);  //value
+//         }
+//         digitalWrite(MAX_CS, HIGH);
+//     }
+// }
+// //*********************************************************************************************************
+// void max7219_set_brightness(unsigned short br)  //brightness MAX7219
+// {
+//     uint8_t j;
+//     if (br < 16) {
+//         digitalWrite(MAX_CS, LOW);
+//         delayMicroseconds(1);
+//         for (j = 0; j < anzMAX; j++) {
+//             SPI.write(0x0A);  //register
+//             SPI.write(br);    //value
+//         }
+//         digitalWrite(MAX_CS, HIGH);
+//     }
+// }
+// //*********************************************************************************************************
+// void clear_Display()   //clear all
+// {
+//     uint8_t i, j;
+//     for (i = 0; i < 8; i++)     //8 rows
+//     {
+//         digitalWrite(MAX_CS, LOW);
+//         delayMicroseconds(1);
+//         for (j = anzMAX; j > 0; j--) {
+//             _LEDarr[j - 1][i] = 0;       //LEDarr clear
+//             SPI.write(i + 1);           //current row
+//             SPI.write(_LEDarr[j - 1][i]);
+//         }
+//         digitalWrite(MAX_CS, HIGH);
+//     }
+// }
+// //*********************************************************************************************************
+// void refresh_display() //take info into LEDarr
+// {
+//     uint8_t i, j;
+
+//     for (i = 0; i < 8; i++)     //8 rows
+//     {
+//         digitalWrite(MAX_CS, LOW);
+//         delayMicroseconds(1);
+//         for (j = anzMAX; j > 0; j--) {
+//             SPI.write(i + 1);  //current row
+//             SPI.write(_LEDarr[j - 1][i]);
+//         }
+//         digitalWrite(MAX_CS, HIGH);
+//     }
+// }
 //*********************************************************************************************************
 uint8_t char2Arr_t(unsigned short ch, int PosX, short PosY) { //characters into arr, shows only the time
     int i, j, k, l, m, o1, o2, o3, o4=0;
@@ -437,9 +405,24 @@ void setup()
     pinMode(MAX_CS, OUTPUT);
     digitalWrite(MAX_CS, HIGH);
     SPI.begin(SPI_SCK, SPI_MISO, SPI_MOSI);
-    // WiFi.disconnect();
-    // WiFiManager wifiManager;
-    // wifiManager.autoConnect("ClockSetup");
+
+    WiFi.mode(WIFI_STA);
+
+    //WiFiManager, Local intialization. Once its business is done, there is no need to keep it around
+    ESP_WiFiManager wm;
+    bool res;
+    // res = wm.autoConnect(); // auto generated AP name from chipid
+    // res = wm.autoConnect("AutoConnectAP"); // anonymous ap
+    res = wm.autoConnect("ClockSetup","password"); // password protected ap
+
+    if(!res) {
+        Serial.println("Failed to connect");
+        // ESP.restart();
+    }
+    else {
+        //if you get here you have connected to the WiFi
+        Serial.println("connected...yeey :)");
+    }
 
     // while (WiFi.status() != WL_CONNECTED) {
     // delay(500);
@@ -447,9 +430,9 @@ void setup()
     // }
     // Serial.println("");
 
-    // Serial.println("WiFi connected");
-    // Serial.print("IP address: ");
-    // Serial.println(WiFi.localIP());
+    Serial.println("WiFi connected");
+    Serial.print("IP address: ");
+    Serial.println(WiFi.localIP());
 
     helpArr_init();
     max7219_init();
@@ -635,14 +618,13 @@ void loop()
                 String txt= "   ";
                 txt += WD_arr[rtc.getweekday()] + " ";
                 txt += String(rtc.getday()) + ". ";
-                txt += M_arr[rtc.getmonth()] + " ";
+                txt += months_array[rtc.getmonth()] + " ";
                 txt += "20" + String(rtc.getyear()) + "   ";
                 sctxtlen=scrolltext(_dPosX, txt);
             }
 //          -------------------------------------
             if(f_scroll_x2){ // user defined text
 #ifdef UDTXT
-                Serial.println("scrolling user defined text");
                 sctxtlen=scrolltext(_dPosX, UDTXT );
 #endif //UDTXT
             }
