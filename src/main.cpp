@@ -5,11 +5,14 @@
 // system libraries
 #include <Arduino.h>
 #include <fonts.h>
-#include <ESP_WiFiManager.h>
 
+#include <ESP32Time.h>
+#include <NTPClient.h>
+#include <WiFiUdp.h>
+
+#include <ESP_WiFiManager.h>
 #include <SPI.h>
 #include <Ticker.h>
-#include <time.h>
 #include <WiFi.h>      //ESP32 Core WiFi Library
 #include <WebServer.h> //Local DNS Server used for redirecting all requests to the configuration portal (  https://github.com/zhouhan0126/DNSServer---esp32  )
 #include <DNSServer.h> //Local WebServer used to serve the configuration portal (  https://github.com/zhouhan0126/DNSServer---esp32  )
@@ -24,7 +27,7 @@
 #define MAX_CS        5
 
 // Timezone -------------------------------------------
-#define TZName       "MSK-3"   // Europe Moscow  (examples see at the bottom)
+// #define TZName       "MSK-3"   // Europe Moscow  (examples see at the bottom)
 
 // User defined text ----------------------------------
 // #define UDTXT        "    Привет! "
@@ -33,8 +36,9 @@
 #define anzMAX       4     // number of cascaded MAX7219
 // #define FORMAT12H          // if not defined time will be displayed in 12h fromat
 #define SCROLLDOWN         // if not defined it scrolls up
-# define BRIGHTNESS_DAY 10
-# define BRIGHTNESS_NIGHT 0
+#define BRIGHTNESS_DAY 10
+#define BRIGHTNESS_NIGHT 0
+#define GMT_OFFSET 10800   // 3 hours by 3600 seconds (GMT+3)
 //-----------------------------------------------------
 //global variables
 unsigned short  brightness = 0;          // values can be 0...15
@@ -61,17 +65,27 @@ String months_array[12] = {"Янв", "Фев", "Мар", "Апр", "Май", "И
 String WD_arr[7] = {"Вск,", "Пон,", "Вт,", "Ср,", "Чт,", "Пят,", "Суб,"};
 
 #include <display.h>
-#include <rtime.h>
 
 
-//objects
-RTIME rtc;
+
+// NTP objects
+
+WiFiUDP ntpUDP;
+// You can specify the time server pool and the offset (in seconds, can be
+// changed later with setTimeOffset() ). Additionally you can specify the
+// update interval (in milliseconds, can be changed using setUpdateInterval() ).
+NTPClient timeClient(ntpUDP);
+
+ESP32Time rtc;
+
+// RTIME class is obsolete and will be removed
+// RTIME rtc;
 Ticker tckr;
 
 //events
-void RTIME_info(const char *info){
-    Serial.printf("rtime_info : %s\n", info);
-}
+// void RTIME_info(const char *info){
+//     Serial.printf("rtime_info : %s\n", info);
+// }
 
 //*********************************************************************************************************
 uint8_t char2Arr_t(unsigned short ch, int PosX, short PosY) { //characters into arr, shows only the time
@@ -195,12 +209,9 @@ void setup()
     SPI.begin(SPI_SCK, SPI_MISO, SPI_MOSI);
 
     WiFi.mode(WIFI_STA);
-
     //WiFiManager, Local intialization. Once its business is done, there is no need to keep it around
     ESP_WiFiManager wm;
     bool res;
-    // res = wm.autoConnect(); // auto generated AP name from chipid
-    // res = wm.autoConnect("AutoConnectAP"); // anonymous ap
     res = wm.autoConnect("ClockSetup","password"); // password protected ap
 
     if(!res) {
@@ -219,8 +230,19 @@ void setup()
     clear_Display();
     max7219_set_brightness(brightness);
 
-    _f_rtc= rtc.begin(TZName);
-    if(!_f_rtc) Serial.println("no timepacket received from ntp");
+    timeClient.begin();
+    timeClient.setTimeOffset(GMT_OFFSET);
+    if (!timeClient.update()) Serial.println("timeClient.update() failed to get time from NTP.");
+
+    if(timeClient.isTimeSet()) {
+        rtc.setTime(timeClient.getEpochTime());
+    } else {
+        Serial.println("timeClient.isTimeSet() = false, no timepacket received from NTP");
+    }
+    // debug
+    // Serial.println("Got time from NTP. Setting RTC:");
+    // Serial.println(timeClient.getFormattedTime());
+    // Serial.println(rtc.getTimeDate());
     tckr.attach(0.05, timer50ms);    // every 50 msec
 }
 //*********************************************************************************************************
@@ -260,20 +282,19 @@ void loop()
     while (true) {
         if(_f_tckr24h == true) { //syncronisize RTC every day
             _f_tckr24h = false;
-            _f_rtc= rtc.begin(TZName);
-            if(_f_rtc==false) Serial.println("no timepacket received");
+            // do here what need to be done once a day
         }
         if (_f_tckr1s == true)        // flag 1sek
         {
-            sek1 = (rtc.getsecond()%10);
-            sek2 = (rtc.getsecond()/10);
-            min1 = (rtc.getminute()%10);
-            min2 = (rtc.getminute()/10);
+            sek1 = (rtc.getSecond()%10);
+            sek2 = (rtc.getSecond()/10);
+            min1 = (rtc.getMinute()%10);
+            min2 = (rtc.getMinute()/10);
 #ifdef FORMAT24H
-            std1 = (rtc.gethour()%10);  // 24 hour format
-            std2 = (rtc.gethour()/10);
+            std1 = (rtc.getHour()%10);  // 24 hour format
+            std2 = (rtc.getHour()/10);
 #else
-            uint8_t h=rtc.gethour();    // convert to 12 hour format
+            uint8_t h=rtc.getHour();    // convert to 12 hour format
             if(h>12) h-=12;
             std1 = (h%10);
             std2 = (h/10);
@@ -326,9 +347,9 @@ void loop()
             std21 = std22;
             std22 = std2;
             _f_tckr1s = false;
-            if (rtc.getsecond() == 45) f_scroll_x1 = true; // scroll ddmmyy
+            if (rtc.getSecond() == 45) f_scroll_x1 = true; // scroll ddmmyy
 #ifdef UDTXT
-            if (rtc.getsecond() == 25) f_scroll_x2 = true; // scroll userdefined text
+            if (rtc.getSecond() == 25) f_scroll_x2 = true; // scroll userdefined text
 #endif //UDTXT
         } // end 1s
 // ----------------------------------------------
@@ -397,10 +418,10 @@ void loop()
 //          -------------------------------------
             if(f_scroll_x1){ // day month year
                 String txt= "   ";
-                txt += WD_arr[rtc.getweekday()] + " ";
-                txt += String(rtc.getday()) + " ";
-                txt += months_array[rtc.getmonth()] + " ";
-                txt += "20" + String(rtc.getyear()) + "   ";
+                txt += WD_arr[rtc.getDayofWeek()] + " ";
+                txt += String(rtc.getDay()) + " ";
+                txt += months_array[rtc.getMonth()] + " ";
+                txt += String(rtc.getYear()) + "   ";
                 sctxtlen = scrolltext(_dPosX, txt);
             }
 //          -------------------------------------
@@ -416,7 +437,7 @@ void loop()
 // -----------------------------------------------
         if (y == 0) {
             // do something else
-        if (rtc.gethour() >= 8 && rtc.gethour() < 21) {
+        if (rtc.getHour() >= 8 && rtc.getHour() < 21) {
             max7219_set_brightness(BRIGHTNESS_DAY);
         } else
             max7219_set_brightness(BRIGHTNESS_NIGHT);
