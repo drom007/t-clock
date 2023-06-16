@@ -30,12 +30,14 @@
 // #define UDTXT        "    Привет! "
 
 // other defines --------------------------------------
-#define BRIGHTNESS   0     // values can be 0...15
 #define anzMAX       4     // number of cascaded MAX7219
 // #define FORMAT12H          // if not defined time will be displayed in 12h fromat
 #define SCROLLDOWN         // if not defined it scrolls up
+# define BRIGHTNESS_DAY 10
+# define BRIGHTNESS_NIGHT 0
 //-----------------------------------------------------
 //global variables
+unsigned short  brightness = 0;          // values can be 0...15
 String   _SSID = "";
 String   _PW   = "";
 String   _myIP = "0.0.0.0";
@@ -215,7 +217,7 @@ void setup()
     helpArr_init();
     max7219_init();
     clear_Display();
-    max7219_set_brightness(BRIGHTNESS);
+    max7219_set_brightness(brightness);
 
     _f_rtc= rtc.begin(TZName);
     if(!_f_rtc) Serial.println("no timepacket received from ntp");
@@ -414,6 +416,10 @@ void loop()
 // -----------------------------------------------
         if (y == 0) {
             // do something else
+        if (rtc.gethour() >= 8 && rtc.gethour() < 21) {
+            max7219_set_brightness(BRIGHTNESS_DAY);
+        } else
+            max7219_set_brightness(BRIGHTNESS_NIGHT);
         }
     }  //end while(true)
     //this section can not be reached
