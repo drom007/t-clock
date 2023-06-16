@@ -34,7 +34,7 @@
 
 // other defines --------------------------------------
 #define anzMAX       4     // number of cascaded MAX7219
-// #define FORMAT12H          // if not defined time will be displayed in 12h fromat
+#define FORMAT24H    true  // if false - time will be displayed in 12h fromat
 #define SCROLLDOWN         // if not defined it scrolls up
 #define BRIGHTNESS_DAY 10
 #define BRIGHTNESS_NIGHT 0
@@ -50,9 +50,9 @@ uint8_t  _maxPosX = anzMAX * 8 - 1;      // calculated maxposition
 uint8_t  _LEDarr[anzMAX][8];             // character matrix to display (40*8)
 uint8_t  _helpArrMAX[anzMAX * 8];        // helperarray for chardecoding
 uint8_t  _helpArrPos[anzMAX * 8];        // helperarray pos of chardecoding
-boolean  _f_tckr1s = false;
-boolean  _f_tckr50ms = false;
-boolean  _f_tckr24h = false;
+boolean  _f_tckr1s = false;              // 1s flag
+boolean  _f_tckr50ms = false;            // 50ms flag
+boolean  _f_tckr24h = false;             // 24h flag
 int16_t  _zPosX = 0;                     //xPosition (display the time)
 int16_t  _dPosX = 0;                     //xPosition (display the date)
 boolean  _f_updown = false;              //scroll direction
@@ -65,8 +65,6 @@ String months_array[12] = {"Янв", "Фев", "Мар", "Апр", "Май", "И
 String WD_arr[7] = {"Вск,", "Пон,", "Вт,", "Ср,", "Чт,", "Пят,", "Суб,"};
 
 #include <display.h>
-
-
 
 // NTP objects
 
@@ -89,20 +87,20 @@ Ticker tckr;
 
 //*********************************************************************************************************
 uint8_t char2Arr_t(unsigned short ch, int PosX, short PosY) { //characters into arr, shows only the time
-    int i, j, k, l, m, o1, o2, o3, o4=0;
+    int i, j, k, l, m, o1, o2, o3, char_width=0;
     PosX++;
     k = ch - 0x30;                       //ASCII position in font
     if ((k >= 0) && (k < 11)){           //character found in font?
-        o4 = font_t[k][0];               //character width
-        o3 = 1 << (o4-1);
-        for (i = 0; i < o4; i++) {
+        char_width = font_t[k][0];               //character width
+        o3 = 1 << (char_width-1);
+        for (i = 0; i < char_width; i++) {
             if (((PosX - i <= _maxPosX) && (PosX - i >= 0)) && ((PosY > -8) && (PosY < 8))){ //within matrix?
                 o1 = _helpArrPos[PosX - i];
                 o2 = _helpArrMAX[PosX - i];
                 for (j = 0; j < 8; j++) {
                     if (((PosY >= 0) && (PosY <= j)) || ((PosY < 0) && (j < PosY + 8))){ //scroll vertical
                         l = font_t[k][j + 1];
-                        m = (l & (o3 >> i));  //e.g. o4=7  0zzzzz0, o4=4  0zz0
+                        m = (l & (o3 >> i));  //e.g. char_width=7  0zzzzz0, char_width=4  0zz0
                         if (m > 0)
                             _LEDarr[o2][j - PosY] = _LEDarr[o2][j - PosY] | (o1);  //set point
                         else
@@ -112,28 +110,28 @@ uint8_t char2Arr_t(unsigned short ch, int PosX, short PosY) { //characters into 
             }
         }
     }
-    return o4;
+    return char_width;
 }
 //*********************************************************************************************************
-uint8_t char2Arr_p(uint16_t ch, int PosX) { //characters into arr, proportional font
-    int i, j, l, m, o1, o2, o3, o4=0;
+uint8_t char2Arr_p(uint16_t ch, int PosX) { // characters into arr, proportional font
+    int i, j, l, m, o1, o2, o3, char_width=0;
     if (ch <= 345){                   //character found in font?
-        o4 = font_p[ch][0];              //character width
-        o3 = 1 << (o4 - 1);
-        for (i = 0; i < o4; i++) {
-            if ((PosX - i <= _maxPosX) && (PosX - i >= 0)){ //within matrix?
+        char_width = font_p[ch][0];              //character width
+        o3 = 1 << (char_width - 1);
+        for (i = 0; i < char_width; i++) {
+            if ((PosX - i <= _maxPosX) && (PosX - i >= 0)) { //within matrix?
                 o1 = _helpArrPos[PosX - i];
                 o2 = _helpArrMAX[PosX - i];
                 for (j = 0; j < 8; j++) {
                     l = font_p[ch][j + 1];
-                    m = (l & (o3 >> i));  //e.g. o4=7  0zzzzz0, o4=4  0zz0
+                    m = (l & (o3 >> i));  //e.g. char_width=7  0zzzzz0, char_width=4  0zz0
                     if (m > 0)  _LEDarr[o2][j] = _LEDarr[o2][j] | (o1);  //set point
                     else        _LEDarr[o2][j] = _LEDarr[o2][j] & (~o1); //clear point
                 }
             }
         }
     }
-    return o4;
+    return char_width;
 }
 //*********************************************************************************************************
 uint16_t scrolltext(int16_t posX, String txt)
@@ -290,15 +288,9 @@ void loop()
             sek2 = (rtc.getSecond()/10);
             min1 = (rtc.getMinute()%10);
             min2 = (rtc.getMinute()/10);
-#ifdef FORMAT24H
-            std1 = (rtc.getHour()%10);  // 24 hour format
-            std2 = (rtc.getHour()/10);
-#else
-            uint8_t h=rtc.getHour();    // convert to 12 hour format
-            if(h>12) h-=12;
-            std1 = (h%10);
-            std2 = (h/10);
-#endif //FORMAT24H
+
+            std1 = (rtc.getHour(FORMAT24H)%10);  // 24 hour format
+            std2 = (rtc.getHour(FORMAT24H)/10);
 
             y = y2;                 //scroll updown
             sc1 = 1;
@@ -437,7 +429,7 @@ void loop()
 // -----------------------------------------------
         if (y == 0) {
             // do something else
-        if (rtc.getHour() >= 8 && rtc.getHour() < 21) {
+        if (rtc.getHour(FORMAT24H) >= 8 && rtc.getHour(FORMAT24H) < 21) {
             max7219_set_brightness(BRIGHTNESS_DAY);
         } else
             max7219_set_brightness(BRIGHTNESS_NIGHT);
