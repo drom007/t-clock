@@ -23,8 +23,9 @@ void helpArr_init(void)  //helperarray init
         }
     }
 }
-//*********************************************************************************************************
-void max7219_init()  //all MAX7219 init
+
+//init all MAX7219 modules
+void max7219_init()
 {
     uint8_t i, j;
     for (i = 0; i < 7; i++) {
@@ -37,8 +38,9 @@ void max7219_init()  //all MAX7219 init
         digitalWrite(MAX_CS, HIGH);
     }
 }
-//*********************************************************************************************************
-void max7219_set_brightness(unsigned short br)  //brightness MAX7219
+
+// set MAX7912 display brightness
+void max7219_set_brightness(unsigned short br)
 {
     uint8_t j;
     if (br < 16) {
@@ -51,7 +53,7 @@ void max7219_set_brightness(unsigned short br)  //brightness MAX7219
         digitalWrite(MAX_CS, HIGH);
     }
 }
-//*********************************************************************************************************
+
 void clear_Display()   //clear all
 {
     uint8_t i, j;
@@ -67,8 +69,9 @@ void clear_Display()   //clear all
         digitalWrite(MAX_CS, HIGH);
     }
 }
-//*********************************************************************************************************
-void refresh_display() //take info into LEDarr
+
+// draw LEDarr array on matrix
+void refresh_display()
 {
     uint8_t i, j;
 
