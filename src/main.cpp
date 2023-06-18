@@ -57,6 +57,7 @@ boolean  _f_tckr24h = false;             // 24h flag
 int16_t  _zPosX = 0;                     //xPosition (display the time)
 int16_t  _dPosX = 0;                     //xPosition (display the date)
 uint16_t _chbuf[MAX_TEXT_LEN];
+boolean show_colon = true;
 
 // String months_array[12] = {"Jan.", "Feb.", "Mar.", "Apr.", "May", "June", "July", "Aug.", "Sep.", "Oct.", "Nov.", "Dec."};
 // String WD_arr[7] = {"Sun,", "Mon,", "Tue,", "Wed,", "Thu,", "Fri,", "Sat,"};
@@ -183,6 +184,10 @@ void timer50ms()
 
 void timer1s() {
     _f_tckr1s = true;
+    if (show_colon) show_colon=false;
+    else show_colon = true;
+    Serial.print("show_colon=");
+    Serial.println(show_colon);
 }
 
 void timer24h() {
@@ -246,7 +251,7 @@ void loop()
     uint8_t hrs11 = 0, hrs12 = 0, hrs21 = 0, hrs22 = 0;
     signed int x = 0; //x1,x2;
     signed int y = 0, y1 = 0, y2 = 0;
-    unsigned int sc1 = 0, sc2 = 0, sc3 = 0, sc4 = 0, sc5 = 0, sc6 = 0;
+    unsigned int scrollChar1 = 0, scrollChar2 = 0, scrollChar3 = 0, scrollChar4 = 0, scrollChar5 = 0, scrollChar6 = 0;
     static int16_t sctxtlen=0;
     boolean f_scrollend_y = false;
     boolean f_scroll_x1 = false;
@@ -282,37 +287,37 @@ void loop()
             hrs2 = (rtc.getHour(FORMAT24H)/10);
 
             y = y2;                 //scroll updown
-            sc1 = 1;
+            scrollChar1 = 1;
             sec1++;
             if (sec1 == 10) {
-                sc2 = 1;
+                scrollChar2 = 1;
                 sec2++;
                 sec1 = 0;
             }
             if (sec2 == 6) {
                 min1++;
                 sec2 = 0;
-                sc3 = 1;
+                scrollChar3 = 1;
             }
             if (min1 == 10) {
                 min2++;
                 min1 = 0;
-                sc4 = 1;
+                scrollChar4 = 1;
             }
             if (min2 == 6) {
                 hrs1++;
                 min2 = 0;
-                sc5 = 1;
+                scrollChar5 = 1;
             }
             if (hrs1 == 10) {
                 hrs2++;
                 hrs1 = 0;
-                sc6 = 1;
+                scrollChar6 = 1;
             }
             if ((hrs2 == 2) && (hrs1 == 4)) {
                 hrs1 = 0;
                 hrs2 = 0;
-                sc6 = 1;
+                scrollChar6 = 1;
             }
 
             sec11 = sec12;
@@ -358,51 +363,55 @@ void loop()
                 }
             }
 //          -------------------------------------
-            if (sc1 == 1) {
-                if (SCROLLDOWN == 1) y--;
-                else                y++;
-                char2Arr_t(48 + sec12, _zPosX - 42, y);
-                char2Arr_t(48 + sec11, _zPosX - 42, y + y1);
-                if (y == 0) {
-                    sc1 = 0;
-                    f_scrollend_y = true;
-                }
-            } else char2Arr_t(48 + sec1, _zPosX - 42, 0);
+
+//             if (scrollChar1 == 1) {
+//                 if (SCROLLDOWN == 1) y--;
+//                 else                y++;
+//                 char2Arr_t(48 + sec12, _zPosX - 42, y);
+//                 char2Arr_t(48 + sec11, _zPosX - 42, y + y1);
+//                 if (y == 0) {
+//                     scrollChar1 = 0;
+//                     f_scrollend_y = true;
+//                 }
+//             } else char2Arr_t(48 + sec1, _zPosX - 42, 0);
+// //          -------------------------------------
+//             if (scrollChar2 == 1) {
+//                 char2Arr_t(48 + sec22, _zPosX - 36, y);
+//                 char2Arr_t(48 + sec21, _zPosX - 36, y + y1);
+//                 if (y == 0) scrollChar2 = 0;
+//             }
+//             else char2Arr_t(48 + sec2, _zPosX - 36, 0);
+
+//             char2Arr_t(':', _zPosX - 32, 0);
 //          -------------------------------------
-            if (sc2 == 1) {
-                char2Arr_t(48 + sec22, _zPosX - 36, y);
-                char2Arr_t(48 + sec21, _zPosX - 36, y + y1);
-                if (y == 0) sc2 = 0;
-            }
-            else char2Arr_t(48 + sec2, _zPosX - 36, 0);
-            char2Arr_t(':', _zPosX - 32, 0);
-//          -------------------------------------
-            if (sc3 == 1) {
+            if (scrollChar3 == 1) {
                 char2Arr_t(48 + min12, _zPosX - 25, y);
                 char2Arr_t(48 + min11, _zPosX - 25, y + y1);
-                if (y == 0) sc3 = 0;
+                if (y == 0) scrollChar3 = 0;
             }
             else char2Arr_t(48 + min1, _zPosX - 25, 0);
 //          -------------------------------------
-            if (sc4 == 1) {
+            if (scrollChar4 == 1) {
                 char2Arr_t(48 + min22, _zPosX - 19, y);
                 char2Arr_t(48 + min21, _zPosX - 19, y + y1);
-                if (y == 0) sc4 = 0;
+                if (y == 0) scrollChar4 = 0;
             }
             else char2Arr_t(48 + min2, _zPosX - 19, 0);
+
             char2Arr_t(':', _zPosX - 15 + x, 0);
+
 //          -------------------------------------
-            if (sc5 == 1) {
+            if (scrollChar5 == 1) {
                 char2Arr_t(48 + hrs12, _zPosX - 8, y);
                 char2Arr_t(48 + hrs11, _zPosX - 8, y + y1);
-                if (y == 0) sc5 = 0;
+                if (y == 0) scrollChar5 = 0;
             }
             else char2Arr_t(48 + hrs1, _zPosX - 8, 0);
 //          -------------------------------------
-            if (sc6 == 1) {
+            if (scrollChar6 == 1) {
                 char2Arr_t(48 + hrs22, _zPosX - 2, y);
                 char2Arr_t(48 + hrs21, _zPosX - 2, y + y1);
-                if (y == 0) sc6 = 0;
+                if (y == 0) scrollChar6 = 0;
             }
             else char2Arr_t(48 + hrs2, _zPosX - 2, 0);
 //          -------------------------------------
@@ -420,16 +429,15 @@ void loop()
 #endif //UDTXT
             }
 //          -------------------------------------
-            refresh_display(); //all 50msec
+            refresh_display(); // each 50ms
             if (f_scrollend_y == true) f_scrollend_y = false;
         } //end 50ms
 // -----------------------------------------------
         if (y == 0) {
             // do something else
-        if (rtc.getHour(FORMAT24H) >= 8 && rtc.getHour(FORMAT24H) < 21) {
-            max7219_set_brightness(BRIGHTNESS_DAY);
-        } else
-            max7219_set_brightness(BRIGHTNESS_NIGHT);
+            if (rtc.getHour(FORMAT24H) >= 8 && rtc.getHour(FORMAT24H) < 21) {
+                    max7219_set_brightness(BRIGHTNESS_DAY);
+            } else max7219_set_brightness(BRIGHTNESS_NIGHT);
         }
     }  //end while(true)
     //this section can not be reached
