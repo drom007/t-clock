@@ -48,22 +48,22 @@ String   _PW   = "";
 String   _myIP = "0.0.0.0";
 // boolean  _f_rtc = false;                 // true if time from ntp is received
 uint8_t  _maxPosX = anzMAX * 8 - 1;      // calculated max X position
-uint8_t  _LEDarr[anzMAX][8];             // character matrix to display (40*8)
+uint8_t  _LEDarr[anzMAX][8];             // character matrix to display (4*8)
 uint8_t  _helpArrMAX[anzMAX * 8];        // helperarray for chardecoding
 uint8_t  _helpArrPos[anzMAX * 8];        // helperarray pos of chardecoding
 boolean  _f_tckr1s = false;              // 1s flag
 boolean  _f_tckr50ms = false;            // 50ms flag
 boolean  _f_tckr24h = false;             // 24h flag
-int16_t  _zPosX = 0;                     //xPosition (display the time)
-int16_t  _dPosX = 0;                     //xPosition (display the date)
-uint16_t _chbuf[MAX_TEXT_LEN];
+int16_t  _zPosX = 0;                     // xPosition (display the time)
+int16_t  _dPosX = 0;                     // xPosition (display the date)
+uint16_t _chbuf[MAX_TEXT_LEN];           // characters buffer stores the position of the 'text' char in font
 boolean show_colon = true;
 
 // String months_array[12] = {"Jan.", "Feb.", "Mar.", "Apr.", "May", "June", "July", "Aug.", "Sep.", "Oct.", "Nov.", "Dec."};
 // String WD_arr[7] = {"Sun,", "Mon,", "Tue,", "Wed,", "Thu,", "Fri,", "Sat,"};
 
 String months_array[12] = {"Янв", "Фев", "Мар", "Апр", "Май", "Июнь", "Июль", "Авг", "Сен", "Окт", "Ноя", "Дек"};
-String WD_arr[7] = {"Вск,", "Пон,", "Вт,", "Ср,", "Чт,", "Пят,", "Суб,"};
+String WD_arr[7] = {"Воскр,", "Пон,", "Вт,", "Ср,", "Чт,", "Пят,", "Суб,"};
 
 #include <display.h>
 
@@ -85,7 +85,7 @@ Ticker tckr24h;
 //     Serial.printf("rtime_info : %s\n", info);
 // }
 
-// translate character and pput it to array by coordinates (shows only the time)
+// translate character and put it to array by coordinates (shows only the time)
 uint8_t char2Arr_t(unsigned short ch, int PosX, short PosY) {
     int i, j, k, l, m, o1, o2, o3, char_width=0;
     PosX++;
@@ -143,10 +143,13 @@ uint16_t scrolltext(int16_t posX, String txt)
             _chbuf[j]=txt[i]-0x20; k=true; i++; j++;
         }
         if(txt[i]==0xC2){   // basic latin section (0x80...0x9f are controls, not used)
-            if((txt[i+1]>=0xA0)&&(txt[i+1]<=0xBF)){_chbuf[j]=txt[i+1]-0x40; k=true; i+=2; j++;}
+            if((txt[i+1]>=0xA0)&&(txt[i+1]<=0xBF)){
+                _chbuf[j]=txt[i+1]-0x40; k=true; i+=2; j++;
+            }
         }
         if(txt[i]==0xC3){   // latin1 supplement section
-            if((txt[i+1]>=0x80)&&(txt[i+1]<=0xBF)){_chbuf[j]=txt[i+1]+0x00; k=true; i+=2; j++;}
+            if((txt[i+1]>=0x80)&&(txt[i+1]<=0xBF)){
+                _chbuf[j]=txt[i+1]+0x00; k=true; i+=2; j++;}
         }
         if(txt[i]==0xCE){   // greek section
             if((txt[i+1]>=0x91)&&(txt[i+1]<=0xBF)){_chbuf[j]=txt[i+1]+0x2F; k=true; i+=2; j++;}
@@ -166,7 +169,8 @@ uint16_t scrolltext(int16_t posX, String txt)
         }
         k=false;
     }
-//  _chbuf stores the position of th char in font and in j is the length of the real string
+//  _chbuf stores the position of the char in font
+// 'j' - is the length of the real string
 
     int16_t p=0;
     for(int k=0; k<j; k++){
@@ -184,6 +188,7 @@ void timer50ms()
 
 void timer1s() {
     _f_tckr1s = true;
+    // show and hide colon in time
     if (show_colon) show_colon=false;
     else show_colon = true;
     Serial.print("show_colon=");
@@ -251,7 +256,7 @@ void loop()
     uint8_t hrs11 = 0, hrs12 = 0, hrs21 = 0, hrs22 = 0;
     signed int x = 0; //x1,x2;
     signed int y = 0, y1 = 0, y2 = 0;
-    unsigned int scrollChar1 = 0, scrollChar2 = 0, scrollChar3 = 0, scrollChar4 = 0, scrollChar5 = 0, scrollChar6 = 0;
+    unsigned int scrollSec1 = 0, scrollSec2 = 0, scrollMin1 = 0, scrollMin2 = 0, scrollHrs1 = 0, scrollHrs2 = 0;
     static int16_t sctxtlen=0;
     boolean f_scrollend_y = false;
     boolean f_scroll_x1 = false;
@@ -287,37 +292,37 @@ void loop()
             hrs2 = (rtc.getHour(FORMAT24H)/10);
 
             y = y2;                 //scroll updown
-            scrollChar1 = 1;
+            scrollSec1 = 1;
             sec1++;
             if (sec1 == 10) {
-                scrollChar2 = 1;
+                scrollSec2 = 1;
                 sec2++;
                 sec1 = 0;
             }
             if (sec2 == 6) {
                 min1++;
                 sec2 = 0;
-                scrollChar3 = 1;
+                scrollMin1 = 1;
             }
             if (min1 == 10) {
                 min2++;
                 min1 = 0;
-                scrollChar4 = 1;
+                scrollMin2 = 1;
             }
             if (min2 == 6) {
                 hrs1++;
                 min2 = 0;
-                scrollChar5 = 1;
+                scrollHrs1 = 1;
             }
             if (hrs1 == 10) {
                 hrs2++;
                 hrs1 = 0;
-                scrollChar6 = 1;
+                scrollHrs2 = 1;
             }
             if ((hrs2 == 2) && (hrs1 == 4)) {
                 hrs1 = 0;
                 hrs2 = 0;
-                scrollChar6 = 1;
+                scrollHrs2 = 1;
             }
 
             sec11 = sec12;
@@ -363,55 +368,63 @@ void loop()
                 }
             }
 //          -------------------------------------
+            if (scrollSec1 || scrollSec2 || scrollMin1 || scrollMin2 || scrollHrs1 || scrollHrs2) {
+                if (SCROLLDOWN == 1) y--;
+                else                 y++;
+            }
 
-//             if (scrollChar1 == 1) {
-//                 if (SCROLLDOWN == 1) y--;
-//                 else                y++;
+//             if (scrollSec1 == 1) {
 //                 char2Arr_t(48 + sec12, _zPosX - 42, y);
 //                 char2Arr_t(48 + sec11, _zPosX - 42, y + y1);
 //                 if (y == 0) {
-//                     scrollChar1 = 0;
+//                     scrollSec1 = 0;
 //                     f_scrollend_y = true;
 //                 }
 //             } else char2Arr_t(48 + sec1, _zPosX - 42, 0);
 // //          -------------------------------------
-//             if (scrollChar2 == 1) {
+//             if (scrollSec2 == 1) {
 //                 char2Arr_t(48 + sec22, _zPosX - 36, y);
 //                 char2Arr_t(48 + sec21, _zPosX - 36, y + y1);
-//                 if (y == 0) scrollChar2 = 0;
+//                 if (y == 0) scrollSec2 = 0;
 //             }
 //             else char2Arr_t(48 + sec2, _zPosX - 36, 0);
 
 //             char2Arr_t(':', _zPosX - 32, 0);
 //          -------------------------------------
-            if (scrollChar3 == 1) {
+            if (scrollMin1 == 1) {
                 char2Arr_t(48 + min12, _zPosX - 25, y);
                 char2Arr_t(48 + min11, _zPosX - 25, y + y1);
-                if (y == 0) scrollChar3 = 0;
+                if (y == 0) scrollMin1 = 0;
             }
             else char2Arr_t(48 + min1, _zPosX - 25, 0);
 //          -------------------------------------
-            if (scrollChar4 == 1) {
+            if (scrollMin2 == 1) {
                 char2Arr_t(48 + min22, _zPosX - 19, y);
                 char2Arr_t(48 + min21, _zPosX - 19, y + y1);
-                if (y == 0) scrollChar4 = 0;
+                if (y == 0) scrollMin2 = 0;
             }
             else char2Arr_t(48 + min2, _zPosX - 19, 0);
 
-            char2Arr_t(':', _zPosX - 15 + x, 0);
+            if (show_colon) {
+                char2Arr_t(':', _zPosX - 15 + x, 0);
+                Serial.println("show ':'");
+            } else {
+                char2Arr_t('.', _zPosX - 15 + x, 0);
+                Serial.println("show '.'");
+            }
 
 //          -------------------------------------
-            if (scrollChar5 == 1) {
+            if (scrollHrs1 == 1) {
                 char2Arr_t(48 + hrs12, _zPosX - 8, y);
                 char2Arr_t(48 + hrs11, _zPosX - 8, y + y1);
-                if (y == 0) scrollChar5 = 0;
+                if (y == 0) scrollHrs1 = 0;
             }
             else char2Arr_t(48 + hrs1, _zPosX - 8, 0);
 //          -------------------------------------
-            if (scrollChar6 == 1) {
+            if (scrollHrs2 == 1) {
                 char2Arr_t(48 + hrs22, _zPosX - 2, y);
                 char2Arr_t(48 + hrs21, _zPosX - 2, y + y1);
-                if (y == 0) scrollChar6 = 0;
+                if (y == 0) scrollHrs2 = 0;
             }
             else char2Arr_t(48 + hrs2, _zPosX - 2, 0);
 //          -------------------------------------
@@ -435,9 +448,17 @@ void loop()
 // -----------------------------------------------
         if (y == 0) {
             // do something else
-            if (rtc.getHour(FORMAT24H) >= 8 && rtc.getHour(FORMAT24H) < 21) {
-                    max7219_set_brightness(BRIGHTNESS_DAY);
-            } else max7219_set_brightness(BRIGHTNESS_NIGHT);
+            if (rtc.getHour(FORMAT24H) >= 9 && rtc.getHour(FORMAT24H) < 21) {
+                    if (brightness != BRIGHTNESS_DAY) {
+                        brightness = BRIGHTNESS_DAY;
+                        max7219_set_brightness(brightness);
+                    }
+            } else {
+                if (brightness != BRIGHTNESS_NIGHT) {
+                        brightness = BRIGHTNESS_NIGHT;
+                        max7219_set_brightness(brightness);
+                }
+            }
         }
     }  //end while(true)
     //this section can not be reached
