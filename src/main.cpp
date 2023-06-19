@@ -251,9 +251,10 @@ void setup()
 void loop()
 {
     uint8_t sec1 = 0, sec2 = 0, min1 = 0, min2 = 0, hrs1 = 0, hrs2 = 0;
-    uint8_t sec11 = 0, sec12 = 0, sec21 = 0, sec22 = 0;
-    uint8_t min11 = 0, min12 = 0, min21 = 0, min22 = 0;
-    uint8_t hrs11 = 0, hrs12 = 0, hrs21 = 0, hrs22 = 0;
+    uint8_t display_sec1 = 0, display_sec2 = 0, display_min1 = 0, display_min2 = 0, display_hrs1 = 0, display_hrs2 = 0;
+    // uint8_t sec11 = 0, sec12 = 0, sec21 = 0, sec22 = 0;
+    // uint8_t min11 = 0, min12 = 0, min21 = 0, min22 = 0;
+    // uint8_t hrs11 = 0, hrs12 = 0, hrs21 = 0, hrs22 = 0;
     signed int x = 0; //x1,x2;
     signed int y = 0, y1 = 0, y2 = 0;
     unsigned int scrollSec1 = 0, scrollSec2 = 0, scrollMin1 = 0, scrollMin2 = 0, scrollHrs1 = 0, scrollHrs2 = 0;
@@ -292,51 +293,37 @@ void loop()
             hrs2 = (rtc.getHour(FORMAT24H)/10);
 
             y = y2;                 //scroll updown
-            scrollSec1 = 1;
-            sec1++;
-            if (sec1 == 10) {
-                scrollSec2 = 1;
-                sec2++;
-                sec1 = 0;
-            }
-            if (sec2 == 6) {
-                min1++;
-                sec2 = 0;
-                scrollMin1 = 1;
-            }
-            if (min1 == 10) {
-                min2++;
-                min1 = 0;
-                scrollMin2 = 1;
-            }
-            if (min2 == 6) {
-                hrs1++;
-                min2 = 0;
-                scrollHrs1 = 1;
-            }
-            if (hrs1 == 10) {
-                hrs2++;
-                hrs1 = 0;
-                scrollHrs2 = 1;
-            }
-            if ((hrs2 == 2) && (hrs1 == 4)) {
-                hrs1 = 0;
-                hrs2 = 0;
-                scrollHrs2 = 1;
+
+            if ( sec1 != display_sec1 ) {
+                scrollSec1 = 1;
+                display_sec1 = sec1;
             }
 
-            sec11 = sec12;
-            sec12 = sec1;
-            sec21 = sec22;
-            sec22 = sec2;
-            min11 = min12;
-            min12 = min1;
-            min21 = min22;
-            min22 = min2;
-            hrs11 = hrs12;
-            hrs12 = hrs1;
-            hrs21 = hrs22;
-            hrs22 = hrs2;
+            if ( sec2 != display_sec2 ) {
+                scrollSec2 = 1;
+                display_sec2 = sec2;
+            }
+
+            if ( min1 != display_min1 ) {
+                scrollMin1 = 1;
+                display_min1 = min1;
+            }
+
+            if ( min2 != display_min2 ) {
+                scrollMin2 = 1;
+                display_min2 = min2;
+            }
+
+            if ( hrs1 != display_hrs1 ) {
+                scrollHrs1 = 1;
+                display_hrs1 = hrs1;
+            }
+
+            if ( hrs2 != display_hrs2 ) {
+                scrollHrs2 = 1;
+                display_hrs2 = hrs2;
+            }
+
             _f_tckr1s = false;
 
             if (rtc.getSecond() == 45) f_scroll_x1 = true; // scroll ddmmyy
@@ -392,15 +379,17 @@ void loop()
 //             char2Arr_t(':', _zPosX - 32, 0);
 //          -------------------------------------
             if (scrollMin1 == 1) {
-                char2Arr_t(48 + min12, _zPosX - 25, y);
-                char2Arr_t(48 + min11, _zPosX - 25, y + y1);
+                char2Arr_t(48 + display_min1, _zPosX - 25, y);
+                char2Arr_t(48 + min1, _zPosX - 25, y + y1);
                 if (y == 0) scrollMin1 = 0;
             }
-            else char2Arr_t(48 + min1, _zPosX - 25, 0);
+            else {
+                char2Arr_t(48 + min1, _zPosX - 25, 0);
+            }
 //          -------------------------------------
             if (scrollMin2 == 1) {
-                char2Arr_t(48 + min22, _zPosX - 19, y);
-                char2Arr_t(48 + min21, _zPosX - 19, y + y1);
+                char2Arr_t(48 + display_min2, _zPosX - 19, y);
+                char2Arr_t(48 + min2, _zPosX - 19, y + y1);
                 if (y == 0) scrollMin2 = 0;
             }
             else char2Arr_t(48 + min2, _zPosX - 19, 0);
@@ -415,15 +404,15 @@ void loop()
 
 //          -------------------------------------
             if (scrollHrs1 == 1) {
-                char2Arr_t(48 + hrs12, _zPosX - 8, y);
-                char2Arr_t(48 + hrs11, _zPosX - 8, y + y1);
+                char2Arr_t(48 + display_hrs1, _zPosX - 8, y);
+                char2Arr_t(48 + hrs1, _zPosX - 8, y + y1);
                 if (y == 0) scrollHrs1 = 0;
             }
             else char2Arr_t(48 + hrs1, _zPosX - 8, 0);
 //          -------------------------------------
             if (scrollHrs2 == 1) {
-                char2Arr_t(48 + hrs22, _zPosX - 2, y);
-                char2Arr_t(48 + hrs21, _zPosX - 2, y + y1);
+                char2Arr_t(48 + display_hrs2, _zPosX - 2, y);
+                char2Arr_t(48 + hrs2, _zPosX - 2, y + y1);
                 if (y == 0) scrollHrs2 = 0;
             }
             else char2Arr_t(48 + hrs2, _zPosX - 2, 0);
