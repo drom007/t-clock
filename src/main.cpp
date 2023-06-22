@@ -4,6 +4,7 @@
 //
 // system libraries
 #include <Arduino.h>
+#include <esp_task_wdt.h>
 #include <fonts.h>
 
 #include <ESP32Time.h>
@@ -19,6 +20,8 @@
 
 #include "apps/sntp/sntp.h"     // espressif esp32/arduino V1.0.0
 //#include "lwip/apps/sntp.h"   // espressif esp32/arduino V1.0.1-rc2 or higher
+
+#define WDT_TIMEOUT 5
 
 // Digital I/O used
 #define SPI_MOSI      23
@@ -62,7 +65,7 @@ boolean show_colon = true;
 // String months_array[12] = {"Jan.", "Feb.", "Mar.", "Apr.", "May", "June", "July", "Aug.", "Sep.", "Oct.", "Nov.", "Dec."};
 // String WD_arr[7] = {"Sun,", "Mon,", "Tue,", "Wed,", "Thu,", "Fri,", "Sat,"};
 
-String months_array[12] = {"Янв", "Фев", "Мар", "Апр", "Май", "Июнь", "Июль", "Авг", "Сен", "Окт", "Ноя", "Дек"};
+String months_array[12] = {"Янв", "Фев", "Мар", "Апр", "Мая", "Июня", "Июля", "Авг", "Сен", "Окт", "Ноя", "Дек"};
 String WD_arr[7] = {"Воскр,", "Пон,", "Вт,", "Ср,", "Чт,", "Пят,", "Суб,"};
 
 #include <display.h>
@@ -85,8 +88,13 @@ Ticker tckr24h;
 //     Serial.printf("rtime_info : %s\n", info);
 // }
 
-// translate character and put it to array by coordinates (shows only the time)
+// translate character and put it to array by coordinates (shows only the time), returns char width
 uint8_t char2Arr_t(unsigned short ch, int PosX, short PosY) {
+    // DEBUG
+    // Serial.print("ch="); Serial.println(ch);
+    // Serial.print("PosX="); Serial.println(PosX);
+    // Serial.print("PosY="); Serial.println(PosY);
+
     int i, j, k, l, m, o1, o2, o3, char_width=0;
     PosX++;
     k = ch - 0x30;                       //ASCII position in font
@@ -112,7 +120,7 @@ uint8_t char2Arr_t(unsigned short ch, int PosX, short PosY) {
     }
     return char_width;
 }
-// translate characters into array (proportional font)
+// translate characters into array (proportional font), returns char width
 uint8_t char2Arr_p(uint16_t ch, int PosX) {
     int i, j, l, m, o1, o2, o3, char_width=0;
     if (ch <= 345){                   //character found in font?
@@ -137,37 +145,37 @@ uint8_t char2Arr_p(uint16_t ch, int PosX) {
 uint16_t scrolltext(int16_t posX, String txt)
 {
     uint16_t i=0, j=0;
-    boolean k=false;
+    boolean char_found=false;
     while((txt[i]!=0) && (j<MAX_TEXT_LEN)) {
         if((txt[i]>=0x20)&&(txt[i]<=0x7f)){     // ASCII section
-            _chbuf[j]=txt[i]-0x20; k=true; i++; j++;
+            _chbuf[j]=txt[i]-0x20; char_found=true; i++; j++;
         }
         if(txt[i]==0xC2){   // basic latin section (0x80...0x9f are controls, not used)
             if((txt[i+1]>=0xA0)&&(txt[i+1]<=0xBF)){
-                _chbuf[j]=txt[i+1]-0x40; k=true; i+=2; j++;
+                _chbuf[j]=txt[i+1]-0x40; char_found=true; i+=2; j++;
             }
         }
         if(txt[i]==0xC3){   // latin1 supplement section
             if((txt[i+1]>=0x80)&&(txt[i+1]<=0xBF)){
-                _chbuf[j]=txt[i+1]+0x00; k=true; i+=2; j++;}
+                _chbuf[j]=txt[i+1]+0x00; char_found=true; i+=2; j++;}
         }
         if(txt[i]==0xCE){   // greek section
-            if((txt[i+1]>=0x91)&&(txt[i+1]<=0xBF)){_chbuf[j]=txt[i+1]+0x2F; k=true; i+=2; j++;}
+            if((txt[i+1]>=0x91)&&(txt[i+1]<=0xBF)){_chbuf[j]=txt[i+1]+0x2F; char_found=true; i+=2; j++;}
         }
         if(txt[i]==0xCF){   // greek section
-            if((txt[i+1]>=0x80)&&(txt[i+1]<=0x89)){_chbuf[j]=txt[i+1]+0x6F; k=true; i+=2; j++;}
+            if((txt[i+1]>=0x80)&&(txt[i+1]<=0x89)){_chbuf[j]=txt[i+1]+0x6F; char_found=true; i+=2; j++;}
         }
         if(txt[i]==0xD0){   // cyrillic section
-            if((txt[i+1]>=0x80)&&(txt[i+1]<=0xBF)){_chbuf[j]=txt[i+1]+0x79; k=true; i+=2; j++;}
+            if((txt[i+1]>=0x80)&&(txt[i+1]<=0xBF)){_chbuf[j]=txt[i+1]+0x79; char_found=true; i+=2; j++;}
         }
         if(txt[i]==0xD1){   // cyrillic section
-            if((txt[i+1]>=0x80)&&(txt[i+1]<=0x9F)){_chbuf[j]=txt[i+1]+0xB9; k=true; i+=2; j++;}
+            if((txt[i+1]>=0x80)&&(txt[i+1]<=0x9F)){_chbuf[j]=txt[i+1]+0xB9; char_found=true; i+=2; j++;}
         }
-        if(k==false){
+        if(char_found==false){
             _chbuf[j]=0x00; // space 1px
             i++; j++;
         }
-        k=false;
+        char_found=false;
     }
 //  _chbuf stores the position of the char in font
 // 'j' - is the length of the real string
@@ -203,6 +211,9 @@ void timer24h() {
 //*********************************************************************************************************
 void setup()
 {
+    esp_task_wdt_init(WDT_TIMEOUT, true); //enable panic so ESP32 restarts
+    esp_task_wdt_add(NULL); //add current thread to WDT watch
+
     Serial.begin(115200); // For debug
     pinMode(MAX_CS, OUTPUT);
     digitalWrite(MAX_CS, HIGH);
@@ -250,6 +261,7 @@ void setup()
 
 void loop()
 {
+    esp_task_wdt_reset();
     uint8_t sec1 = 0, sec2 = 0, min1 = 0, min2 = 0, hrs1 = 0, hrs2 = 0;
     uint8_t display_sec1 = 0, display_sec2 = 0, display_min1 = 0, display_min2 = 0, display_hrs1 = 0, display_hrs2 = 0;
     // uint8_t sec11 = 0, sec12 = 0, sec21 = 0, sec22 = 0;
@@ -360,30 +372,20 @@ void loop()
                 else                 y++;
             }
 
-//             if (scrollSec1 == 1) {
-//                 char2Arr_t(48 + sec12, _zPosX - 42, y);
-//                 char2Arr_t(48 + sec11, _zPosX - 42, y + y1);
-//                 if (y == 0) {
-//                     scrollSec1 = 0;
-//                     f_scrollend_y = true;
-//                 }
-//             } else char2Arr_t(48 + sec1, _zPosX - 42, 0);
-// //          -------------------------------------
-//             if (scrollSec2 == 1) {
-//                 char2Arr_t(48 + sec22, _zPosX - 36, y);
-//                 char2Arr_t(48 + sec21, _zPosX - 36, y + y1);
-//                 if (y == 0) scrollSec2 = 0;
-//             }
-//             else char2Arr_t(48 + sec2, _zPosX - 36, 0);
-
-//             char2Arr_t(':', _zPosX - 32, 0);
-//          -------------------------------------
             if (scrollMin1 == 1) {
+                // DEBUG
+                Serial.print("char2Arr_t(48 "+ String(display_min1) +", ");
+                Serial.println(String(_zPosX) + " - 25, " + String(y) + ")");
+
+                Serial.print("char2Arr_t(48 + " + String(min1) + ", " + String(_zPosX) + " - 25," );
+                Serial.println(String(y) + " + " + String(y1)+ ")");
+
                 char2Arr_t(48 + display_min1, _zPosX - 25, y);
-                char2Arr_t(48 + min1, _zPosX - 25, y + y1);
+                char2Arr_t(48 + min1,         _zPosX - 25, y + y1);
                 if (y == 0) scrollMin1 = 0;
             }
             else {
+                Serial.println("else: char2Arr_t(48 + " + String(min1) + ", " + String(_zPosX) + " - 25, 0)" );
                 char2Arr_t(48 + min1, _zPosX - 25, 0);
             }
 //          -------------------------------------
@@ -396,10 +398,8 @@ void loop()
 
             if (show_colon) {
                 char2Arr_t(':', _zPosX - 15 + x, 0);
-                Serial.println("show ':'");
             } else {
                 char2Arr_t('.', _zPosX - 15 + x, 0);
-                Serial.println("show '.'");
             }
 
 //          -------------------------------------
